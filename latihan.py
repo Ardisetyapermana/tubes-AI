@@ -1,186 +1,172 @@
-
-
 import math
 import random
 
+TOTAL_POP = 100
+PANJANG_KROMOSOM = 40
+BIT_PER_X = 20
+BATAS_BAWAH = -10.0
+BATAS_ATAS = 10.0
+PROB_CROSSOVER = 0.8
+PROB_MUTASI = 0.01
+MAKS_GENERASI = 500
+JUM_ELITE = 2
 
-POPULATION_SIZE   = 100      
-CHROMOSOME_LENGTH = 40       
-BITS_PER_VAR      = 20       
-X_MIN             = -10.0   
-X_MAX             = 10.0     
-PC                = 0.8      
-PM                = 0.01    
-MAX_GENERATION    = 500      
-ELITISM_COUNT     = 2        
+def decode_biner(kromosom):
 
-
-def decode_chromosome(chromosome):
+    gen_x1 = kromosom[:BIT_PER_X]
+    gen_x2 = kromosom[BIT_PER_X:]
     
-    bits_x1 = chromosome[:BITS_PER_VAR]
-    decimal_x1 = 0
-    for bit in bits_x1:
-        decimal_x1 = decimal_x1 * 2 + bit  
-    x1 = X_MIN + (decimal_x1 / (2 ** BITS_PER_VAR - 1)) * (X_MAX - X_MIN)
+    desimal_1 = 0
+    for b in gen_x1:
+        desimal_1 = (desimal_1 * 2) + b
+    nilai_x1 = BATAS_BAWAH + (desimal_1 / ((2 ** BIT_PER_X) - 1)) * (BATAS_ATAS - BATAS_BAWAH)
 
-    bits_x2 = chromosome[BITS_PER_VAR:]
-    decimal_x2 = 0
-    for bit in bits_x2:
-        decimal_x2 = decimal_x2 * 2 + bit
-    x2 = X_MIN + (decimal_x2 / (2 ** BITS_PER_VAR - 1)) * (X_MAX - X_MIN)
+   
+    desimal_2 = 0
+    for b in gen_x2:
+        desimal_2 = (desimal_2 * 2) + b
+    nilai_x2 = BATAS_BAWAH + (desimal_2 / ((2 ** BIT_PER_X) - 1)) * (BATAS_ATAS - BATAS_BAWAH)
 
-    return x1, x2
+    return nilai_x1, nilai_x2
 
-
-
-def objective_function(x1, x2):
-    
-    
+def hitung_fungsi_objektif(var_x1, var_x2):
     
     try:
-        term1 = math.sin(x1) * math.cos(x2) * math.tan(x1 + x2)
-        term2 = 0.5 * math.exp(1 - math.sqrt(x2 ** 2))
-        return -(term1 + term2)
+        bagian1 = math.sin(var_x1) * math.cos(var_x2) * math.tan(var_x1 + var_x2)
+        bagian2 = 0.5 * math.exp(1 - math.sqrt(var_x2 ** 2))
+        
+        return -(bagian1 + bagian2)
     except (ValueError, OverflowError, ZeroDivisionError):
-        
-        return float('inf')
+       
+        return float('inf') 
 
-
-def calculate_fitness(chromosome):
-   
-
-    x1, x2 = decode_chromosome(chromosome)
-    return objective_function(x1, x2)
-
-def initialize_population():
-   
-    population = []
-    for _ in range(POPULATION_SIZE):
-        
-        chromosome = [random.randint(0, 1) for _ in range(CHROMOSOME_LENGTH)]
-        population.append(chromosome)
-    return population
-
-def tournament_selection(population, fitness_values, tournament_size=3):
-   
-    selected_indices = [random.randint(0, POPULATION_SIZE - 1)
-                        for _ in range(tournament_size)]
+def bangkitkan_populasi_awal():
     
-    best_index = selected_indices[0]
-    for idx in selected_indices[1:]:
-        if fitness_values[idx] < fitness_values[best_index]:
-            best_index = idx
-    return population[best_index][:]   
+    pop_awal = []
+    for _ in range(TOTAL_POP):
+        individu = [random.randint(0, 1) for _ in range(PANJANG_KROMOSOM)]
+        pop_awal.append(individu)
+    return pop_awal
 
-def crossover(parent1, parent2):
+def seleksi_turnamen(populasi, skor_fitness, ukuran_turnamen=3):
     
-    if random.random() < PC:
-        point = random.randint(1, CHROMOSOME_LENGTH - 1)  
-        child1 = parent1[:point] + parent2[point:]
-        child2 = parent2[:point] + parent1[point:]
-    else:
-
-        child1 = parent1[:]
-        child2 = parent2[:]
-    return child1, child2
-
-def mutate(chromosome):
+    kandidat = random.sample(range(TOTAL_POP), ukuran_turnamen)
     
-    mutated = chromosome[:]
-    for i in range(CHROMOSOME_LENGTH):
-        if random.random() < PM:
-            mutated[i] = 1 - mutated[i]   # flip bit
-    return mutated
+    pemenang_idx = kandidat[0]
+    for idx in kandidat[1:]:
+        if skor_fitness[idx] < skor_fitness[pemenang_idx]:
+            pemenang_idx = idx
+            
+    return populasi[pemenang_idx][:]
 
-def create_next_generation(population, fitness_values):
+def pindah_silang(induk1, induk2):
+    
+    if random.random() <= PROB_CROSSOVER:
+        titik_potong = random.randint(1, PANJANG_KROMOSOM - 1)
+        anak1 = induk1[:titik_potong] + induk2[titik_potong:]
+        anak2 = induk2[:titik_potong] + induk1[titik_potong:]
+        return anak1, anak2
+    
+    return induk1[:], induk2[:]
+
+def mutasi_gen(kromosom):
+    
+    hasil_mutasi = kromosom[:]
+    for i in range(PANJANG_KROMOSOM):
+        if random.random() <= PROB_MUTASI:
+           
+            hasil_mutasi[i] = 1 if hasil_mutasi[i] == 0 else 0
+    return hasil_mutasi
+
+def bentuk_generasi_baru(populasi_lama, daftar_fitness):
    
-    new_population = []
+    populasi_baru = []
 
-    sorted_indices = sorted(range(POPULATION_SIZE),
-                            key=lambda i: fitness_values[i])
-    for i in range(ELITISM_COUNT):
-        new_population.append(population[sorted_indices[i]][:])
-
-    while len(new_population) < POPULATION_SIZE:
-        
-        parent1 = tournament_selection(population, fitness_values)
-        parent2 = tournament_selection(population, fitness_values)
-
-        
-        child1, child2 = crossover(parent1, parent2)
-
-        
-        child1 = mutate(child1)
-        child2 = mutate(child2)
-
-        new_population.append(child1)
-        if len(new_population) < POPULATION_SIZE:
-            new_population.append(child2)
-
-    return new_population
-
-def run_genetic_algorithm():
     
-    print("=" * 60)
-    print("  GENETIC ALGORITHM — Minimasi f(x1, x2)")
-    print("=" * 60)
-    print(f"  Ukuran Populasi : {POPULATION_SIZE}")
-    print(f"  Panjang Kromosom: {CHROMOSOME_LENGTH} bit ({BITS_PER_VAR} bit/variabel)")
-    print(f"  Pc (Crossover)  : {PC}")
-    print(f"  Pm (Mutasi)     : {PM}")
-    print(f"  Max Generasi    : {MAX_GENERATION}")
-    print(f"  Elitisme        : {ELITISM_COUNT} individu")
-    print("=" * 60)
+    urutan_terbaik = sorted(range(TOTAL_POP), key=lambda i: daftar_fitness[i])
+    for i in range(JUM_ELITE):
+        populasi_baru.append(populasi_lama[urutan_terbaik[i]][:])
 
-    population = initialize_population()
+    
+    while len(populasi_baru) < TOTAL_POP:
+        ortu1 = seleksi_turnamen(populasi_lama, daftar_fitness)
+        ortu2 = seleksi_turnamen(populasi_lama, daftar_fitness)
 
-    best_chromosome_ever = None
-    best_fitness_ever    = float('inf')
+        keturunan1, keturunan2 = pindah_silang(ortu1, ortu2)
 
-    for generation in range(1, MAX_GENERATION + 1):
+        keturunan1 = mutasi_gen(keturunan1)
+        keturunan2 = mutasi_gen(keturunan2)
 
-        fitness_values = [calculate_fitness(chrom) for chrom in population]
+        populasi_baru.append(keturunan1)
+        
+        if len(populasi_baru) < TOTAL_POP:
+            populasi_baru.append(keturunan2)
 
-        best_idx = 0
-        for i in range(1, POPULATION_SIZE):
-            if fitness_values[i] < fitness_values[best_idx]:
-                best_idx = i
+    return populasi_baru
+
+def jalankan_algoritma():
+    print("-" * 50)
+    print(" >>> PROGRAM ALGORITMA GENETIKA (MINIMASI) <<<")
+    print("-" * 50)
+    print(f" [+] Total Populasi : {TOTAL_POP}")
+    print(f" [+] Prob Crossover : {PROB_CROSSOVER}")
+    print(f" [+] Prob Mutasi    : {PROB_MUTASI}")
+    print(f" [+] Max Generasi   : {MAKS_GENERASI}")
+    print("-" * 50)
+
+    populasi_sekarang = bangkitkan_populasi_awal()
+    
+    kromosom_paling_fit = None
+    fitness_paling_baik = float('inf')
+
+    for gen in range(1, MAKS_GENERASI + 1):
+        
+        
+        nilai_fitness = []
+        for kromosom in populasi_sekarang:
+            x1, x2 = decode_biner(kromosom)
+            nilai_fitness.append(hitung_fungsi_objektif(x1, x2))
+
+       
+        idx_terbaik_lokal = 0
+        for i in range(1, TOTAL_POP):
+            if nilai_fitness[i] < nilai_fitness[idx_terbaik_lokal]:
+                idx_terbaik_lokal = i
 
         
-        if fitness_values[best_idx] < best_fitness_ever:
-            best_fitness_ever    = fitness_values[best_idx]
-            best_chromosome_ever = population[best_idx][:]
+        if nilai_fitness[idx_terbaik_lokal] < fitness_paling_baik:
+            fitness_paling_baik = nilai_fitness[idx_terbaik_lokal]
+            kromosom_paling_fit = populasi_sekarang[idx_terbaik_lokal][:]
 
         
-        if generation % 50 == 0 or generation == 1:
-            bx1, bx2 = decode_chromosome(best_chromosome_ever)
-            print(f"  Gen {generation:>4} | Best f = {best_fitness_ever:12.6f} "
-                  f"| x1 = {bx1:8.5f}, x2 = {bx2:8.5f}")
+        if gen == 1 or gen % 50 == 0:
+            bx1, bx2 = decode_biner(kromosom_paling_fit)
+            print(f" [Gen {gen:>3}] Fitness Terbaik = {fitness_paling_baik:.6f} | x1: {bx1:.5f}, x2: {bx2:.5f}")
 
-        population = create_next_generation(population, fitness_values)
+       
+        populasi_sekarang = bentuk_generasi_baru(populasi_sekarang, nilai_fitness)
 
-
-    print("\n" + "=" * 60)
-    print("  HASIL AKHIR")
-    print("=" * 60)
-    x1_best, x2_best = decode_chromosome(best_chromosome_ever)
-
-    print(f"\n  Kromosom Terbaik:")
-    bits_str = ''.join(map(str, best_chromosome_ever))
-    print(f"    x1 (bit 0-19) : {bits_str[:BITS_PER_VAR]}")
-    print(f"    x2 (bit 20-39): {bits_str[BITS_PER_VAR:]}")
-    print(f"    Full          : {bits_str}")
-
-    print(f"\n  Nilai Dekode:")
-    print(f"    x1 = {x1_best:.6f}")
-    print(f"    x2 = {x2_best:.6f}")
-    print(f"\n  Nilai Fungsi Minimum:")
-    print(f"    f(x1, x2) = {best_fitness_ever:.6f}")
-    print("=" * 60)
-
-    return best_chromosome_ever, x1_best, x2_best, best_fitness_ever
-
+    
+    print("\n" + "*" * 50)
+    print(" KESIMPULAN HASIL PENCARIAN")
+    print("*" * 50)
+    
+    x1_final, x2_final = decode_biner(kromosom_paling_fit)
+    teks_kromosom = ''.join(str(bit) for bit in kromosom_paling_fit)
+    
+    print(" Susunan Genotip (Kromosom Terbaik):")
+    print(f" -> Bagian x1 : {teks_kromosom[:BIT_PER_X]}")
+    print(f" -> Bagian x2 : {teks_kromosom[BIT_PER_X:]}")
+    
+    print(f"\n Hasil Dekode Fenotip:")
+    print(f" -> Nilai x1  = {x1_final:.7f}")
+    print(f" -> Nilai x2  = {x2_final:.7f}")
+    
+    print(f"\n Nilai Objektif Minimum:")
+    print(f" -> f(x1, x2) = {fitness_paling_baik:.7f}")
+    print("*" * 50)
 
 if __name__ == "__main__":
-    random.seed(42)   
-    run_genetic_algorithm()
+   
+    random.seed(42) 
+    jalankan_algoritma()
